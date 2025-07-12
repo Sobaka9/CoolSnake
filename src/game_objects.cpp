@@ -1,15 +1,19 @@
 #include "../hdr/game_objects.hpp"
 #include <SFML/Graphics.hpp>
 
-Cell::Cell(sf::Vector2f _position, sf::Vector2f _size, int _outline_thickness) {
+Cell::Cell(sf::Vector2u _position, int _size, int _outline_thickness) {
     pos = _position;
     size = _size;
     outline_thickness = _outline_thickness;
     state = EMPTY;
+    neighbors.left = nullptr;
+    neighbors.right = nullptr;
+    neighbors.up = nullptr;
+    neighbors.down = nullptr;
 
-    sf::RectangleShape square(size);
+    sf::RectangleShape square(sf::Vector2f(size, size));
     rectangle = square;
-    rectangle.setPosition(pos);
+    rectangle.setPosition(sf::Vector2f(static_cast<float>(pos.x), static_cast<float>(pos.y)));
     rectangle.setFillColor(sf::Color::Transparent);
     rectangle.setOutlineColor(sf::Color(100,100,100));
     rectangle.setOutlineThickness(outline_thickness);
@@ -40,51 +44,84 @@ enum cell_state Cell::get_state() {
     return state;
 }
 
-sf::Vector2f Cell::get_position() {
+sf::Vector2u Cell::get_position() {
     return pos;
 }
 
-Grid::Grid(int _grid_size, int _cell_count, int _thickness) {
+Cell* Cell::get_neighbor(enum direction dir) const {
+    switch(dir) {
+        case LEFT:
+            return neighbors.left;
+        case RIGHT:
+            return neighbors.right;
+        case UP:
+            return neighbors.up;
+        case DOWN:
+            return neighbors.down;
+        default:
+            return nullptr;
+    }
+}
+
+void Grid::initialize_cell_neighbors() {
+    for(int i = 0; i < size.x; i++) {
+        for(int j = 0; j < size.y; j++) {
+            Cell& current_cell = cells[i][j];
+            if (i > 0) 
+                current_cell.neighbors.left = &cells[i-1][j];
+            if (i < size.x-1) 
+                current_cell.neighbors.right = &cells[i+1][j];
+            if (j > 0) 
+                current_cell.neighbors.up = &cells[i][j-1];
+            if (j < size.y-1) 
+                current_cell.neighbors.down = &cells[i][j+1];
+        }
+    }
+}
+
+Grid::Grid(sf::Vector2u grid_pos, sf::Vector2i _grid_size, int cell_size, int _thickness) {
     size = _grid_size;
-    cell_count = _cell_count;
-    for(int i = 0; i < cell_count; i++) {
+    pos = grid_pos;
+
+    for(int i = 0; i < size.x; i++) {
         std::vector<Cell> row_cells;
-        for(int j = 0; j < cell_count; j++) {
-            sf::Vector2f _position = {static_cast<float>(i) / _cell_count * _grid_size, static_cast<float>(j) / _cell_count * _grid_size};
-            sf::Vector2f _size = {static_cast<float>(_grid_size) / _cell_count, static_cast<float>(_grid_size) / _cell_count};
-            Cell new_cell = Cell(_position, _size, _thickness);
+        for(int j = 0; j < size.y; j++) {
+            sf::Vector2u relative_position = {i * cell_size, j * cell_size};
+            sf::Vector2u global_position = pos + relative_position;
+            Cell new_cell = Cell(global_position, cell_size, _thickness);
             row_cells.push_back(new_cell);
         }
         cells.push_back(row_cells);
     }
+    initialize_cell_neighbors();
     generate_food();
 }
 
 void Grid::renderGrid(sf::RenderWindow& window) {
     for(const auto& row_cells : cells){
         for(const auto& cell : row_cells){
+            pos = {
+                (window.getSize().x - size.x) / 2,
+                (window.getSize().y - size.y) / 2
+            };
             cell.draw_cell(window);
         }
     }
 }
 
-int Grid::get_count() const{
-    return cell_count;
-}
-
 void Grid::set_cell_state(int cell_x, int cell_y, enum cell_state state) {
-    cells[cell_x * cell_count/size][cell_y * cell_count/size].set_state(state);
+    cells[cell_x][cell_y].set_state(state);
 }
 
 Cell* Grid::get_cell(int cell_x, int cell_y){
-    if (cell_x >= size or cell_y >= size
+    if (cell_x >= size.x or cell_y >= size.y
         or cell_x < 0 or cell_y < 0){
         return NULL;
     }
-    return &cells[cell_x * cell_count/size][cell_y * cell_count/size];
+    return &cells[cell_x][cell_y];
 }
 
-int Grid::get_size(){
+sf::Vector2i Grid::get_size() const {
     return size;
 }
 
@@ -100,6 +137,7 @@ void Grid::generate_food(){
 Cell* Grid::get_random_non_snake_cell() {
     srand(time(0));
     std::vector<Cell*> non_snake_cells;
+
     for (auto& row : cells) {
         for (auto& cell : row) {
             if (cell.get_state() != SNAKE) {
@@ -113,32 +151,20 @@ Cell* Grid::get_random_non_snake_cell() {
 }
 
 Snake::Snake(Grid& grid) {
-    int midpoint = grid.get_size() / 2;
-    grid.set_cell_state(midpoint, midpoint, SNAKE);
-    head = grid.get_cell(midpoint, midpoint);
+    sf::Vector2i midpoint = {grid.get_size().x / 2, grid.get_size().y / 2};
+    grid.set_cell_state(midpoint.x, midpoint.y, SNAKE);
+    head = grid.get_cell(midpoint.x, midpoint.y);
+
     snake_cells.push_back(head);
     length = 1;
 }
 
-void Snake::update(Grid& grid, enum direction dir) {
-    sf::Vector2f head_pos = head->get_position();
-    int offset = grid.get_size() / grid.get_count();
+bool Snake::update(enum direction dir) {
     Cell* tail = snake_cells[0];
+    bool has_eaten_food = false;
 
-    switch (dir) {
-        case LEFT:
-            head = grid.get_cell(head_pos.x - offset, head_pos.y);
-            break;
-        case RIGHT:
-            head = grid.get_cell(head_pos.x + offset, head_pos.y);
-            break;
-        case DOWN:
-            head = grid.get_cell(head_pos.x, head_pos.y + offset);
-            break;
-        case UP:
-            head = grid.get_cell(head_pos.x, head_pos.y - offset);
-            break;
-    }
+    // move the head according to the input direction
+    head = head->get_neighbor(dir);
 
     if (!head) {
         exit(EXIT_SUCCESS);
@@ -147,7 +173,7 @@ void Snake::update(Grid& grid, enum direction dir) {
     switch(head->get_state()) {
         case EMPTY:
             // Move Body
-            grid.set_cell_state(tail->get_position().x, tail->get_position().y, EMPTY);
+            tail->set_state(EMPTY);
             for(int i = 0; i < length - 1; i++){
                 snake_cells[i] = snake_cells[i+1];
             }
@@ -158,7 +184,7 @@ void Snake::update(Grid& grid, enum direction dir) {
             // Add Food as head and don't move the body
             snake_cells.push_back(head);
             length++;
-            grid.generate_food();
+            has_eaten_food = true;
             break;
 
         case SNAKE:
@@ -166,5 +192,7 @@ void Snake::update(Grid& grid, enum direction dir) {
             break;
     }
 
-    grid.set_cell_state(head->get_position().x, head->get_position().y, SNAKE);
+    head->set_state(SNAKE);
+    
+    return has_eaten_food;
 }

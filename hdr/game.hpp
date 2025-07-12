@@ -13,6 +13,7 @@ class Game {
         Snake snake;
 
     public:
-        Game(enum game_type type);
+        Game(sf::Vector2u grid_pos, sf::Vector2i grid_size, int cell_size, enum game_type type);
         void update(sf::RenderWindow& window, enum direction dir);
+        
 };
