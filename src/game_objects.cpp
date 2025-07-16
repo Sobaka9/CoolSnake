@@ -1,7 +1,7 @@
 #include "../hdr/game_objects.hpp"
 #include <SFML/Graphics.hpp>
 
-Cell::Cell(sf::Vector2u _position, int _size, int _outline_thickness) {
+Cell::Cell(sf::Vector2i _position, int _size, int _outline_thickness) {
     pos = _position;
     size = _size;
     outline_thickness = _outline_thickness;
@@ -15,7 +15,7 @@ Cell::Cell(sf::Vector2u _position, int _size, int _outline_thickness) {
     rectangle = square;
     rectangle.setPosition(sf::Vector2f(static_cast<float>(pos.x), static_cast<float>(pos.y)));
     rectangle.setFillColor(sf::Color::Transparent);
-    rectangle.setOutlineColor(sf::Color(100,100,100));
+    rectangle.setOutlineColor(sf::Color(100,100,100, 50));
     rectangle.setOutlineThickness(outline_thickness);
 }
 
@@ -44,7 +44,7 @@ enum cell_state Cell::get_state() {
     return state;
 }
 
-sf::Vector2u Cell::get_position() {
+sf::Vector2i Cell::get_position() const {
     return pos;
 }
 
@@ -86,8 +86,8 @@ Grid::Grid(sf::Vector2u grid_pos, sf::Vector2i _grid_size, int cell_size, int _t
     for(int i = 0; i < size.x; i++) {
         std::vector<Cell> row_cells;
         for(int j = 0; j < size.y; j++) {
-            sf::Vector2u relative_position = {i * cell_size, j * cell_size};
-            sf::Vector2u global_position = pos + relative_position;
+            sf::Vector2i relative_position = {i * cell_size, j * cell_size};
+            sf::Vector2i global_position = sf::Vector2i(static_cast<int>(pos.x), static_cast<int>(pos.y)) + relative_position;
             Cell new_cell = Cell(global_position, cell_size, _thickness);
             row_cells.push_back(new_cell);
         }
@@ -95,18 +95,6 @@ Grid::Grid(sf::Vector2u grid_pos, sf::Vector2i _grid_size, int cell_size, int _t
     }
     initialize_cell_neighbors();
     generate_food();
-}
-
-void Grid::renderGrid(sf::RenderWindow& window) {
-    for(const auto& row_cells : cells){
-        for(const auto& cell : row_cells){
-            pos = {
-                (window.getSize().x - size.x) / 2,
-                (window.getSize().y - size.y) / 2
-            };
-            cell.draw_cell(window);
-        }
-    }
 }
 
 void Grid::set_cell_state(int cell_x, int cell_y, enum cell_state state) {
@@ -148,6 +136,19 @@ Cell* Grid::get_random_non_snake_cell() {
     if (non_snake_cells.empty()) return nullptr;
     int idx = rand() % non_snake_cells.size();
     return non_snake_cells[idx];
+}
+
+
+const std::vector<std::vector<Cell>>& Grid::get_cells() const{
+    return cells;
+}
+
+void Grid::set_grid_pos(sf::Vector2u pos){
+    this->pos = pos;
+}
+
+Cell* Snake::get_head() const {
+    return head;
 }
 
 Snake::Snake(Grid& grid) {
