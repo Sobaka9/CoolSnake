@@ -2,15 +2,15 @@
 
 int main()
 {
-    sf::Vector2i grid_size = {20, 20};
-    sf::Vector2 window_size = {800u, 800u};
+    sf::Vector2i gridSize = {20, 20};
+    sf::Vector2 windowSize = {800u, 800u};
 
     Game game(
-        grid_size,
-        window_size,
+        gridSize,
+        windowSize,
         HAMILTON,
         "Snake",
-        100
+        20
     );
 
 }

@@ -12,7 +12,7 @@ FetchContent_Declare(SFML
     SYSTEM)
 FetchContent_MakeAvailable(SFML)
 
-add_executable(cool_snake src/main.cpp src/game_objects.cpp src/game.cpp) 
+add_executable(cool_snake src/main.cpp src/game_objects.cpp src/game.cpp src/path.cpp) 
 target_include_directories(cool_snake PUBLIC hdr)
 target_compile_features(cool_snake PRIVATE cxx_std_17)
 target_link_libraries(cool_snake PRIVATE SFML::Graphics SFML::System)
